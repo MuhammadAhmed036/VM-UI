@@ -197,8 +197,29 @@ log "NATS deployment finished"
 
 function rtspScript(request: DeploymentRequest) {
   return `${commonHeader(request)}
-INSTALLER="$(cfg rtspInstallerPath)"
-INSTALLER="\${INSTALLER/#\\$HOME/$HOME}"
+PACKAGE_DIR="$(dirname "$PACKAGE_PATH")"
+CONFIGURED_INSTALLER="$(cfg rtspInstallerPath)"
+INSTALLER="$CONFIGURED_INSTALLER"
+if [[ "$CONFIGURED_INSTALLER" == "\\$HOME/SAFECITY_RELEASE/"* ]]; then
+  INSTALLER="$PACKAGE_DIR/\${CONFIGURED_INSTALLER#\\$HOME/SAFECITY_RELEASE/}"
+elif [[ "$CONFIGURED_INSTALLER" == "\\$HOME/"* ]]; then
+  PACKAGE_OWNER_HOME="$(python3 - "$PACKAGE_PATH" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+parts = p.parts
+if len(parts) >= 3 and parts[1] == "home":
+    print("/home/" + parts[2])
+else:
+    print(str(Path.home()))
+PY
+)"
+  INSTALLER="$PACKAGE_OWNER_HOME/\${CONFIGURED_INSTALLER#\\$HOME/}"
+fi
+if [ ! -f "$INSTALLER" ] && [ -f "$PACKAGE_DIR/INSTALL_CLEAN_RTSP_GOLDEN.sh" ]; then
+  INSTALLER="$PACKAGE_DIR/INSTALL_CLEAN_RTSP_GOLDEN.sh"
+fi
+log "Golden installer: $INSTALLER"
 require_file "$INSTALLER"
 NATJET="/opt/natjet-offline-1.0.1"
 require_file "$NATJET/.env"
@@ -208,8 +229,12 @@ WORK="$HOME/rtsp-offline"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 cp "$PACKAGE_PATH" "$WORK/"
+[ ! -f "$PACKAGE_PATH.sha256" ] || cp "$PACKAGE_PATH.sha256" "$WORK/"
 cp "$INSTALLER" "$WORK/"
+[ ! -f "$INSTALLER.sha256" ] || cp "$INSTALLER.sha256" "$WORK/"
 cd "$WORK"
+[ ! -f "$(basename "$PACKAGE_PATH").sha256" ] || sha256sum -c "$(basename "$PACKAGE_PATH").sha256"
+[ ! -f "$(basename "$INSTALLER").sha256" ] || sha256sum -c "$(basename "$INSTALLER").sha256"
 tar -xzf "$(basename "$PACKAGE_PATH")"
 chmod 750 "$(basename "$INSTALLER")"
 log "Running golden RTSP installer"
