@@ -141,7 +141,12 @@ function streamingScript(request: DeploymentRequest) {
   return `${commonHeader(request)}
 write_camera_route
 WORK="/opt/offline-installer"
+STREAMING_RUNTIME="/opt/safecity-streaming"
 log "Preparing Streaming Server workspace"
+if command -v docker >/dev/null 2>&1; then
+  docker rm -f safecity-mediamtx >/dev/null 2>&1 || true
+fi
+rm -rf "$STREAMING_RUNTIME"
 mkdir -p "$WORK"
 rm -rf "$WORK/streaming-server-offline-v1.0.0"
 tar -xzf "$PACKAGE_PATH" -C "$WORK"
@@ -165,6 +170,25 @@ printf '%s\n' \
   "$(cfg streamPublishUser)" \
   "$(cfg streamPublishPass)" \
   | ./install.sh
+require_dir "$STREAMING_RUNTIME"
+write_camera_inventory "$STREAMING_RUNTIME/cameras.json"
+cat > "$STREAMING_RUNTIME/docker-compose.override.yml" <<'EOF'
+services:
+  mediamtx:
+    restart: unless-stopped
+EOF
+chmod 644 "$STREAMING_RUNTIME/docker-compose.override.yml"
+log "Recreating Streaming container with latest camera inventory"
+cd "$STREAMING_RUNTIME"
+docker compose config >/dev/null
+docker compose up -d --force-recreate --pull never mediamtx
+for i in $(seq 1 80); do
+  STATE="$(docker inspect safecity-mediamtx --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+  [ "$STATE" = "healthy" ] && break
+  sleep 3
+done
+docker exec safecity-mediamtx python3 /usr/local/bin/mtxctl.py init-cameras /etc/mediamtx/cameras.json >/dev/null 2>&1 || true
+docker exec safecity-mediamtx python3 /usr/local/bin/mtxctl.py list || true
 log "Verifying Streaming deployment"
 docker exec safecity-mediamtx bash /opt/mtxctl-tools/verify_deployment.sh || true
 docker ps --filter name=safecity-mediamtx --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
