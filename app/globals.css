@@ -277,6 +277,8 @@ button { cursor: pointer; }
 }
 .scan-box strong { display: block; font-size: 11.5px; }
 .scan-box span { display: block; margin-top: 4px; color: var(--muted-2); font-size: 10.5px; }
+.scan-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.hidden-file-input { display: none; }
 .secondary-button, .primary-button {
   min-height: 37px;
   display: inline-flex;
@@ -508,6 +510,8 @@ button { cursor: pointer; }
   .component-grid { grid-template-columns: 1fr; }
   .workspace-heading { align-items: flex-start; flex-direction: column; }
   .scan-box, .deploy-action-row { align-items: stretch; flex-direction: column; }
+  .scan-actions { justify-content: stretch; }
+  .scan-actions .secondary-button { flex: 1; }
   .selection-summary strong { max-width: 100%; }
   .primary-button { width: 100%; }
   .form-grid { grid-template-columns: 1fr; }

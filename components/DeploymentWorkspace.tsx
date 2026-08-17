@@ -39,6 +39,7 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
   const [logs, setLogs] = useState<string[]>([]);
   const [jobId, setJobId] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
+  const packageUploadRef = useRef<HTMLInputElement>(null);
 
   const selectedPackage = packages.find((item) => item.path === selectedPackagePath) ?? null;
 
@@ -99,6 +100,37 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
     setSelectedPackagePath(data.packages[0]?.path ?? "");
     setStatus("ready");
     setLogs([`Found ${data.packages.length} package(s) for ${component.name}.`]);
+  }
+
+  async function uploadPackage(file: File | null) {
+    if (!file) return;
+    setStatus("running");
+    setLogs([`Uploading ${file.name} to the VM release folder...`]);
+
+    const form = new FormData();
+    form.append("componentId", component.id);
+    form.append("vm", JSON.stringify(vm));
+    form.append("file", file);
+
+    const res = await fetch("/api/packages/upload", {
+      method: "POST",
+      body: form,
+    });
+    const data = await res.json();
+
+    if (packageUploadRef.current) packageUploadRef.current.value = "";
+
+    if (!res.ok) {
+      setStatus("failed");
+      setLogs([data.error ?? "Package upload failed"]);
+      return;
+    }
+
+    const uploaded = data.package as PackageFile;
+    setPackages((current) => [uploaded, ...current.filter((item) => item.path !== uploaded.path)]);
+    setSelectedPackagePath(uploaded.path);
+    setStatus("ready");
+    setLogs([`Uploaded package to ${uploaded.path}`]);
   }
 
   async function startJob(endpoint: "/api/deployments" | "/api/control", payload: Record<string, unknown>) {
@@ -188,12 +220,29 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
           <div className="scan-box">
             <div>
               <strong>Packages already on the VM</strong>
-              <span>The app scans this VM directly from the configured folder.</span>
+              <span>Scan existing packages or upload a new tar package to the release folder.</span>
             </div>
-            <button className="secondary-button" onClick={scanPackages} disabled={status === "scanning" || status === "running"}>
-              <RefreshIcon className={status === "scanning" ? "button-icon spinning" : "button-icon"} />
-              {status === "scanning" ? "Scanning..." : "Scan packages"}
-            </button>
+            <div className="scan-actions">
+              <input
+                ref={packageUploadRef}
+                className="hidden-file-input"
+                type="file"
+                accept=".tar,.tgz,.gz"
+                onChange={(event) => void uploadPackage(event.target.files?.[0] ?? null)}
+              />
+              <button className="secondary-button" onClick={scanPackages} disabled={status === "scanning" || status === "running"}>
+                <RefreshIcon className={status === "scanning" ? "button-icon spinning" : "button-icon"} />
+                {status === "scanning" ? "Scanning..." : "Scan packages"}
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => packageUploadRef.current?.click()}
+                disabled={status === "scanning" || status === "running"}
+              >
+                <FolderIcon className="button-icon" />
+                Upload package
+              </button>
+            </div>
           </div>
 
           <div className="package-list">
