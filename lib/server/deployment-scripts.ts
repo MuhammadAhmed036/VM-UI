@@ -151,7 +151,13 @@ cd "$STREAM_DIR"
 [ ! -x ./verify_bundle.sh ] || ./verify_bundle.sh
 write_camera_inventory "$STREAM_DIR/app/cameras.json"
 log "Running Streaming install.sh"
-./install.sh
+printf '%s\n' \
+  "$VM_IP" \
+  "8554" \
+  "8000" \
+  "8889" \
+  "8189" \
+  | ./install.sh
 log "Verifying Streaming deployment"
 docker exec safecity-mediamtx bash /opt/mtxctl-tools/verify_deployment.sh || true
 docker ps --filter name=safecity-mediamtx --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
