@@ -334,8 +334,21 @@ log "YOLO Consumer deployment finished"
 function uiScript(request: DeploymentRequest) {
   return `${commonHeader(request)}
 DASH_DIR="$(cfg uiWorkDir)"
-[ -n "$DASH_DIR" ] || DASH_DIR="$HOME/safecity-dashboard"
-DASH_DIR="\${DASH_DIR/#\\$HOME/$HOME}"
+PACKAGE_OWNER_HOME="$(python3 - "$PACKAGE_PATH" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+parts = p.parts
+if len(parts) >= 3 and parts[1] == "home":
+    print("/home/" + parts[2])
+else:
+    print(str(Path.home()))
+PY
+)"
+[ -n "$DASH_DIR" ] || DASH_DIR="$PACKAGE_OWNER_HOME/safecity-dashboard"
+if [[ "$DASH_DIR" == "\\$HOME/"* ]]; then
+  DASH_DIR="$PACKAGE_OWNER_HOME/\${DASH_DIR#\\$HOME/}"
+fi
 log "Preparing SafeCity UI dashboard in $DASH_DIR"
 mkdir -p "$DASH_DIR"
 tar -xf "$PACKAGE_PATH" -C "$DASH_DIR"
@@ -354,7 +367,7 @@ env_set_quoted .env STREAMS_API_PASSWORD "$(cfg streamsApiPassword)"
 env_set_quoted .env CAMERA_FEED_BASE_URL "$(cfg cameraFeedBaseUrl)"
 env_set_quoted .env CAMERA_FEED_USERNAME "$(cfg cameraFeedUsername)"
 env_set_quoted .env CAMERA_FEED_PASSWORD "$(cfg cameraFeedPassword)"
-chmod 600 .env
+chmod 644 .env
 if [ -x ./deploy.sh ]; then
   log "Running dashboard deploy.sh"
   ./deploy.sh
