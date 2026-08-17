@@ -1,5 +1,36 @@
 import type { ConfigField, DeployComponent, SectionId } from "./types";
 
+const defaultCameraJson = JSON.stringify(
+  [
+    {
+      name: "Gelecek_Office",
+      url: "rtsp://username:password@192.168.10.241:554/stream",
+      description: "Office camera",
+      mode: "d",
+      fps: 15,
+      enabled: true,
+    },
+    {
+      name: "entrance",
+      url: "rtsp://username:password@192.168.10.243:554/stream",
+      description: "Entrance camera",
+      mode: "d",
+      fps: 15,
+      enabled: true,
+    },
+    {
+      name: "kitchen_Cooridor",
+      url: "rtsp://username:password@192.168.10.244:554/stream",
+      description: "Kitchen corridor camera",
+      mode: "d",
+      fps: 15,
+      enabled: true,
+    },
+  ],
+  null,
+  2,
+);
+
 const vmFields: ConfigField[] = [
   { key: "vmIp", label: "VM IP", kind: "text", required: true, placeholder: "192.168.18.216" },
   { key: "lanIface", label: "LAN interface", kind: "text", required: true, defaultValue: "ens18" },
@@ -14,6 +45,7 @@ const cameraFields: ConfigField[] = [
     label: "Camera inventory JSON",
     kind: "textarea",
     required: true,
+    defaultValue: defaultCameraJson,
     placeholder:
       '[{"name":"entrance","url":"rtsp://user:pass@192.168.10.241:554/stream","description":"Entrance","mode":"d","fps":15,"enabled":true}]',
     help: "Each camera needs name, url, mode b/c/d, fps, and enabled.",
@@ -28,7 +60,7 @@ export const COMPONENTS: DeployComponent[] = [
     description: "Install the offline Streaming Server bundle and configure camera publishing.",
     icon: "stream",
     packageHint: "streaming-server-offline-v1.0.0-amd64.tar.gz",
-    defaultScanDirs: ["$HOME/SAFECITY_RELEASE", "/opt/offline-installer", "/home"],
+    defaultScanDirs: ["$HOME/SAFECITY_RELEASE"],
     packagePatterns: ["streaming-server-offline*.tar.gz", "streaming-server*.tar"],
     workDir: "/opt/offline-installer/streaming-server-offline-v1.0.0",
     services: ["safecity-mediamtx"],
@@ -56,7 +88,7 @@ export const COMPONENTS: DeployComponent[] = [
     description: "Install the golden RTSP Snapshot Engine and bind Streaming outputs to NATS.",
     icon: "play",
     packageHint: "rtsp-engine-known-good-1.0.0-x86_64-20260808-135340.tar.gz",
-    defaultScanDirs: ["$HOME/SAFECITY_RELEASE", "/home", "/opt"],
+    defaultScanDirs: ["$HOME/SAFECITY_RELEASE"],
     packagePatterns: ["rtsp-engine-known-good*.tar.gz"],
     workDir: "/opt/safecity-rtsp-engine",
     services: ["rtsp-engine"],
@@ -80,7 +112,7 @@ export const COMPONENTS: DeployComponent[] = [
     description: "Install NAT-JetStream v1.0.1, provision FRAMES_PREVIEW and FRAMES_V2, and enable reboot policy.",
     icon: "network",
     packageHint: "natjet-offline-1.0.1-x86_64.tar.gz",
-    defaultScanDirs: ["$HOME/SAFECITY_RELEASE", "/opt", "/home"],
+    defaultScanDirs: ["$HOME/SAFECITY_RELEASE"],
     packagePatterns: ["natjet-offline-*.tar.gz"],
     workDir: "/opt/natjet-offline-1.0.1",
     services: ["natjet-nats", "natjet-sandbox"],
@@ -99,7 +131,7 @@ export const COMPONENTS: DeployComponent[] = [
     description: "Deploy, configure, and manage the YOLO full-role consumer with PostgreSQL and event viewer.",
     icon: "database",
     packageHint: "yolo-stage2-220-clean-airgap.tar.gz",
-    defaultScanDirs: ["$HOME/SAFECITY_RELEASE", "/opt", "/home"],
+    defaultScanDirs: ["$HOME/SAFECITY_RELEASE"],
     packagePatterns: ["yolo-stage2-*.tar.gz"],
     workDir: "/opt/yolo-stage2/bundle/deploy/stage2_docker",
     services: ["yolo_postgres_stage2", "yolo_event_viewer_stage2", "yolo_helper_per_camera_retention_stage2", "yolo_ov_nats_worker_stage2"],
@@ -125,7 +157,7 @@ export const COMPONENTS: DeployComponent[] = [
     description: "Deploy the dashboard package last and apply .env changes through update-env.sh.",
     icon: "screen",
     packageHint: "safecity-dashboard-0.1.0.tar",
-    defaultScanDirs: ["$HOME/SAFECITY_RELEASE", "$HOME", "/home", "/opt"],
+    defaultScanDirs: ["$HOME/SAFECITY_RELEASE"],
     packagePatterns: ["safecity-dashboard-*.tar", "aiphase2-dashboard-*.tar.gz"],
     workDir: "$HOME/safecity-dashboard",
     services: ["safecity-dashboard"],

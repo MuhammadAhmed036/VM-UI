@@ -18,18 +18,17 @@ The app scans configured directories on the Ubuntu VM for existing `.tar`, `.tar
 - YOLO configuration apply recreates dashboard/helper/worker without touching PostgreSQL
 - Dockerized production runtime with `openssh-client`
 
-## SSH Access
+## Local VM Access
 
-The browser never runs SSH directly. The Next.js server process runs SSH commands, so the deployment manager host/container must have non-interactive SSH access to the Ubuntu VM.
+When this app is running on the same Ubuntu VM that contains `~/SAFECITY_RELEASE`, keep the target value as:
 
-Recommended setup:
-
-```bash
-ssh-keygen -t ed25519 -f ./ssh-keys/safecity_deploy
-ssh-copy-id -i ./ssh-keys/safecity_deploy.pub aitest@192.168.18.216
+```text
+local
 ```
 
-When running in Docker, mount keys into `/keys` and enter `/keys/safecity_deploy` in the UI.
+In local mode the app scans package files directly from the VM filesystem. No SSH user or SSH key is required for package scanning.
+
+For deployment actions that change `/opt`, systemd, routes, or Docker, run the app with an account that can execute the required sudo commands.
 
 ## Run Locally
 

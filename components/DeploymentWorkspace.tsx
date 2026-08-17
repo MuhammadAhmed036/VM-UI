@@ -160,27 +160,15 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
           <div className="panel-title-row">
             <div>
               <span className="panel-kicker">Connection</span>
-              <h3>Ubuntu VM access</h3>
+              <h3>Local package source</h3>
             </div>
             <SettingsIcon className="panel-icon" />
           </div>
 
           <div className="form-grid compact">
             <label>
-              <span>VM IP / host</span>
-              <input value={vm.host} onChange={(event) => patchVm("host", event.target.value)} placeholder="192.168.18.216" />
-            </label>
-            <label>
-              <span>SSH user</span>
-              <input value={vm.user} onChange={(event) => patchVm("user", event.target.value)} placeholder="aitest" />
-            </label>
-            <label>
-              <span>SSH port</span>
-              <input value={vm.port} onChange={(event) => patchVm("port", event.target.value)} />
-            </label>
-            <label>
-              <span>SSH key path</span>
-              <input value={vm.sshKeyPath} onChange={(event) => patchVm("sshKeyPath", event.target.value)} placeholder="/keys/safecity_id_rsa" />
+              <span>Target</span>
+              <input value={vm.host} onChange={(event) => patchVm("host", event.target.value)} placeholder="local" />
             </label>
             <label>
               <span>Release directory</span>
@@ -200,7 +188,7 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
           <div className="scan-box">
             <div>
               <strong>Packages already on the VM</strong>
-              <span>Use local for this VM, or enter SSH details for another VM.</span>
+              <span>The app scans this VM directly from the configured folder.</span>
             </div>
             <button className="secondary-button" onClick={scanPackages} disabled={status === "scanning" || status === "running"}>
               <RefreshIcon className={status === "scanning" ? "button-icon spinning" : "button-icon"} />
@@ -334,7 +322,7 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
         </div>
 
         <div className="log-footer">
-          <span>Uses remote SSH commands from the Next.js server process</span>
+          <span>Uses local VM commands from the Next.js server process</span>
           {status === "success" && <strong><CheckIcon /> Job completed</strong>}
         </div>
       </div>

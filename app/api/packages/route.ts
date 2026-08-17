@@ -36,8 +36,8 @@ set -e
 for d in ${safeDirs}; do
   eval "expanded=\\"$d\\""
   [ -d "$expanded" ] || continue
-  find "$expanded" -maxdepth 3 -type f \\( ${findNames} \\) -printf '%p\\t%s\\t%TY-%Tm-%Td %TH:%TM\\n'
-done | sort -r | head -100
+  find "$expanded" -maxdepth 1 -type f \\( ${findNames} \\) -printf '%p\\t%s\\t%TY-%Tm-%Td %TH:%TM\\n'
+done | head -100
 `)}`;
 
   const result = await runSshCommand(body.vm, command);
@@ -45,22 +45,25 @@ done | sort -r | head -100
     return NextResponse.json({ error: result.stderr || "Package scan failed" }, { status: 500 });
   }
 
+  const seenNames = new Set<string>();
   const packages: PackageFile[] = result.stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line, index) => {
+    .flatMap((line, index) => {
       const [path, bytes = "0", modified = ""] = line.split("\t");
       const name = path.split("/").pop() || path;
+      if (seenNames.has(name)) return [];
+      seenNames.add(name);
       const sizeMb = Number(bytes) / 1024 / 1024;
-      return {
+      return [{
         id: `${component.id}-${index}-${Buffer.from(path).toString("base64url")}`,
         name,
         path,
         size: sizeMb >= 1024 ? `${(sizeMb / 1024).toFixed(2)} GB` : `${Math.max(sizeMb, 0.01).toFixed(2)} MB`,
         modified,
         componentId: component.id,
-      };
+      }];
     });
 
   return NextResponse.json({ packages });

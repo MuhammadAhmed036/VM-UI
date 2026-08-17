@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getComponent } from "@/lib/deployment-catalog";
 import { buildControlScript } from "@/lib/server/deployment-scripts";
 import { appendJobLog, createJob, finishJob } from "@/lib/server/jobs";
-import { runSshScript } from "@/lib/server/ssh";
+import { isLocalTarget, runSshScript } from "@/lib/server/ssh";
 import type { ComponentId, VmConnectionConfig } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as ControlBody;
   const component = getComponent(body.componentId);
   if (!component) return NextResponse.json({ error: "Unknown component" }, { status: 400 });
-  if (!body.vm?.host || !body.vm?.user) {
-    return NextResponse.json({ error: "VM IP/host and SSH user are required" }, { status: 400 });
+  if (!body.vm || (!isLocalTarget(body.vm) && (!body.vm.host || !body.vm.user))) {
+    return NextResponse.json({ error: "Remote VM IP/host and SSH user are required" }, { status: 400 });
   }
 
   const job = createJob(body.componentId);

@@ -3,14 +3,16 @@ import { getComponent } from "@/lib/deployment-catalog";
 import type { DeploymentRequest } from "@/lib/types";
 import { buildDeploymentScript } from "@/lib/server/deployment-scripts";
 import { appendJobLog, createJob, finishJob } from "@/lib/server/jobs";
-import { runSshScript } from "@/lib/server/ssh";
+import { isLocalTarget, runSshScript } from "@/lib/server/ssh";
 
 export const runtime = "nodejs";
 
 function validateRequest(body: DeploymentRequest) {
   const component = getComponent(body.componentId);
   if (!component) return "Unknown component";
-  if (!body.vm?.host || !body.vm?.user) return "VM IP/host and SSH user are required";
+  if (!body.vm || (!isLocalTarget(body.vm) && (!body.vm.host || !body.vm.user))) {
+    return "Remote VM IP/host and SSH user are required";
+  }
   if (!body.packagePath) return "A package must be selected";
 
   for (const field of component.fields) {
