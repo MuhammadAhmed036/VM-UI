@@ -1,0 +1,12 @@
+services:
+  deploy-manager-ui:
+    build: .
+    image: safecity/deploy-manager-ui:latest
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./ssh-keys:/keys:ro
+    restart: unless-stopped
