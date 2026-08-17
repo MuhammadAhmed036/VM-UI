@@ -23,7 +23,7 @@ chmod +x scripts/offline/build-offline-bundle.sh
 Copy the output folder to the target VM:
 
 ```bash
-scp -r dist/deploy-manager-ui-offline user@VM_IP:/home/user/
+scp dist/deploy-manager-ui-offline.tar.gz user@VM_IP:/home/user/
 ```
 
 ## Install On Offline Ubuntu VM
@@ -31,7 +31,8 @@ scp -r dist/deploy-manager-ui-offline user@VM_IP:/home/user/
 On the target VM:
 
 ```bash
-cd ~/deploy-manager-ui-offline
+tar -xzf deploy-manager-ui-offline.tar.gz
+cd deploy-manager-ui-offline
 sudo SAFECITY_VM_USER="$USER" ./install-offline.sh
 ```
 

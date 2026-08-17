@@ -14,6 +14,11 @@ die() { printf '[offline-install][FAIL] %s\n' "$*" >&2; exit 1; }
 [ "$(id -u)" = "0" ] || die "Run with sudo: sudo ./install-offline.sh"
 [ -f "$IMAGE_TAR" ] || die "Missing image tar: $IMAGE_TAR"
 
+if [ -f "$BASE/MANIFEST.sha256" ]; then
+  log "Verifying offline bundle manifest"
+  (cd "$BASE" && sha256sum -c MANIFEST.sha256)
+fi
+
 install_docker_offline() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     log "Docker and Docker Compose are already installed"

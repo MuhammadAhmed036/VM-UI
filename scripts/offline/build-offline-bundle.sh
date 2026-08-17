@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${OUT:-$ROOT/dist/deploy-manager-ui-offline}"
+ARCHIVE="${ARCHIVE:-$ROOT/dist/deploy-manager-ui-offline.tar.gz}"
 IMAGE="${IMAGE:-safecity/deploy-manager-ui:latest}"
 DOCKER_DEB_DIR="$OUT/docker-debs"
 
@@ -59,5 +60,10 @@ fi
 
 (cd "$OUT" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 -r sha256sum > MANIFEST.sha256)
 
+log "Creating one-file offline archive"
+rm -f "$ARCHIVE"
+tar -C "$(dirname "$OUT")" -czf "$ARCHIVE" "$(basename "$OUT")"
+
 log "Offline bundle ready: $OUT"
-log "Copy this whole folder to the air-gapped Ubuntu VM and run: sudo ./install-offline.sh"
+log "Offline tar ready: $ARCHIVE"
+log "Copy the tar to the air-gapped Ubuntu VM, extract it, and run: sudo ./install-offline.sh"

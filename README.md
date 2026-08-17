@@ -65,9 +65,10 @@ chmod +x scripts/offline/build-offline-bundle.sh
 ./scripts/offline/build-offline-bundle.sh
 ```
 
-Copy `dist/deploy-manager-ui-offline` to the offline VM, then run:
+Copy `dist/deploy-manager-ui-offline.tar.gz` to the offline VM, then run:
 
 ```bash
+tar -xzf deploy-manager-ui-offline.tar.gz
 cd deploy-manager-ui-offline
 sudo SAFECITY_VM_USER="$USER" ./install-offline.sh
 ```
