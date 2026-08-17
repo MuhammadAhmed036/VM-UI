@@ -148,6 +148,7 @@ tar -xzf "$PACKAGE_PATH" -C "$WORK"
 STREAM_DIR="$(find "$WORK" -maxdepth 1 -type d -name 'streaming-server-offline*' | head -1)"
 require_dir "$STREAM_DIR"
 cd "$STREAM_DIR"
+[ -x ./install.sh ] || chmod 750 ./install.sh
 [ ! -x ./verify_bundle.sh ] || ./verify_bundle.sh
 write_camera_inventory "$STREAM_DIR/app/cameras.json"
 log "Running Streaming install.sh"
@@ -157,6 +158,12 @@ printf '%s\n' \
   "8000" \
   "8889" \
   "8189" \
+  "$(cfg streamWebUser)" \
+  "$(cfg streamWebPass)" \
+  "$(cfg streamReadUser)" \
+  "$(cfg streamReadPass)" \
+  "$(cfg streamPublishUser)" \
+  "$(cfg streamPublishPass)" \
   | ./install.sh
 log "Verifying Streaming deployment"
 docker exec safecity-mediamtx bash /opt/mtxctl-tools/verify_deployment.sh || true
