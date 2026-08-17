@@ -14,7 +14,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssh-client ca-certificates \
+  && apt-get install -y --no-install-recommends openssh-client ca-certificates util-linux \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./

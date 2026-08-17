@@ -23,11 +23,14 @@ function packagePatternMatches(pattern: string, filename: string) {
 }
 
 function resolveReleaseDir(vm: VmConnectionConfig) {
-  const configured = (vm.releaseDir || vm.scanDirs.split(/\r?\n|,/)[0] || "$HOME/SAFECITY_RELEASE").trim();
+  const configured = (vm.releaseDir || vm.scanDirs.split(/\r?\n|,/)[0] || process.env.SAFECITY_RELEASE_DIR || "$HOME/SAFECITY_RELEASE").trim();
   if (configured.startsWith("/")) return configured;
 
   if (configured.startsWith("$HOME/")) {
     const suffix = configured.slice("$HOME/".length);
+    const configuredUser = process.env.SAFECITY_VM_USER;
+    if (configuredUser) return path.join("/home", configuredUser, suffix);
+
     const sudoUser = process.env.SUDO_USER;
     if (sudoUser && existsSync(`/home/${sudoUser}`)) return path.join("/home", sudoUser, suffix);
 
@@ -36,11 +39,15 @@ function resolveReleaseDir(vm: VmConnectionConfig) {
 
     const home = process.env.HOME;
     if (home && home !== "/root") return path.join(home, suffix);
-
-    if (existsSync("/home/aitest")) return path.join("/home/aitest", suffix);
   }
 
   return path.resolve(configured.replace(/^\$HOME\/?/, process.env.HOME ? `${process.env.HOME}/` : ""));
+}
+
+function containerWritablePath(hostPath: string) {
+  const hostRoot = process.env.DEPLOY_MANAGER_HOST_ROOT || process.env.HOST_ROOT;
+  if (!hostRoot || !hostPath.startsWith("/")) return hostPath;
+  return path.join(hostRoot, hostPath);
 }
 
 function packageSnapshot(componentId: ComponentId, filePath: string, sizeBytes: number, modified: Date): PackageFile {
@@ -82,12 +89,14 @@ export async function POST(request: NextRequest) {
   }
 
   const releaseDir = resolveReleaseDir(vm);
-  await mkdir(releaseDir, { recursive: true });
+  const writableReleaseDir = containerWritablePath(releaseDir);
+  await mkdir(writableReleaseDir, { recursive: true });
 
   const destination = path.join(releaseDir, filename);
+  const writableDestination = containerWritablePath(destination);
   const bytes = Buffer.from(await upload.arrayBuffer());
-  await writeFile(destination, bytes, { mode: 0o644 });
+  await writeFile(writableDestination, bytes, { mode: 0o644 });
 
-  const info = await stat(destination);
+  const info = await stat(writableDestination);
   return NextResponse.json({ package: packageSnapshot(component.id, destination, info.size, info.mtime) });
 }

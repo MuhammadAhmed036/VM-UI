@@ -32,9 +32,18 @@ export function isLocalTarget(vm: VmConnectionConfig) {
   return !host || host === "local" || host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
 
+function localCommandRunner(command: string) {
+  if (process.env.DEPLOY_MANAGER_HOST_MODE === "nsenter") {
+    return ["nsenter", ["--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "bash", "-lc", command]] as const;
+  }
+
+  return ["bash", ["-lc", command]] as const;
+}
+
 export function runLocalCommand(command: string): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn("bash", ["-lc", command], { windowsHide: true });
+    const [bin, args] = localCommandRunner(command);
+    const child = spawn(/* turbopackIgnore: true */ bin, args, { windowsHide: true });
     let stdout = "";
     let stderr = "";
 
@@ -53,7 +62,7 @@ export function runSshCommand(vm: VmConnectionConfig, remoteCommand: string): Pr
   if (isLocalTarget(vm)) return runLocalCommand(remoteCommand);
 
   return new Promise((resolve, reject) => {
-    const child = spawn("ssh", sshArgs(vm, remoteCommand), { windowsHide: true });
+    const child = spawn(/* turbopackIgnore: true */ "ssh", sshArgs(vm, remoteCommand), { windowsHide: true });
     let stdout = "";
     let stderr = "";
 
@@ -75,8 +84,12 @@ export function runSshScript(
 ): Promise<number | null> {
   if (isLocalTarget(vm)) {
     return new Promise((resolve, reject) => {
-      const args = vm.sudo ? ["-lc", "sudo bash -s"] : ["-s"];
-      const child = spawn("bash", args, { windowsHide: true });
+      const hostMode = process.env.DEPLOY_MANAGER_HOST_MODE === "nsenter";
+      const bin = hostMode ? "nsenter" : "bash";
+      const args = hostMode
+        ? ["--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "bash", "-s"]
+        : vm.sudo ? ["-lc", "sudo bash -s"] : ["-s"];
+      const child = spawn(/* turbopackIgnore: true */ bin, args, { windowsHide: true });
       let pending = "";
 
       function append(chunk: Buffer) {
@@ -99,7 +112,7 @@ export function runSshScript(
 
   return new Promise((resolve, reject) => {
     const remoteCommand = vm.sudo ? "sudo bash -s" : "bash -s";
-    const child = spawn("ssh", sshArgs(vm, remoteCommand), { windowsHide: true });
+    const child = spawn(/* turbopackIgnore: true */ "ssh", sshArgs(vm, remoteCommand), { windowsHide: true });
     let pending = "";
 
     function append(chunk: Buffer) {

@@ -1,12 +1,19 @@
 services:
   deploy-manager-ui:
-    build: .
+    container_name: deploy-manager-ui
     image: safecity/deploy-manager-ui:latest
-    ports:
-      - "3000:3000"
+    network_mode: host
+    pid: host
+    privileged: true
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      PORT: ${APP_PORT:-3000}
+      DEPLOY_MANAGER_HOST_MODE: nsenter
+      DEPLOY_MANAGER_HOST_ROOT: /host
+      SAFECITY_RELEASE_DIR: ${SAFECITY_RELEASE_DIR:-/home/safecity/SAFECITY_RELEASE}
+      SAFECITY_VM_USER: ${SAFECITY_VM_USER:-safecity}
     volumes:
+      - /:/host
       - ./ssh-keys:/keys:ro
     restart: unless-stopped

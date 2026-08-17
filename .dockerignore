@@ -5,3 +5,6 @@ Dockerfile
 docker-compose.yml
 ssh-keys
 .git
+dist
+scripts/offline/*.tar
+scripts/offline/docker-debs

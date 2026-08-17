@@ -46,13 +46,46 @@ http://localhost:3000
 ## Run With Docker
 
 ```bash
-docker compose up --build
+docker build -t safecity/deploy-manager-ui:latest .
+docker compose up -d
 ```
 
 Open:
 
 ```text
 http://localhost:3000
+```
+
+## Offline Docker Deployment
+
+For an air-gapped Ubuntu VM, build the offline bundle on an internet-connected Ubuntu machine first:
+
+```bash
+chmod +x scripts/offline/build-offline-bundle.sh
+./scripts/offline/build-offline-bundle.sh
+```
+
+Copy `dist/deploy-manager-ui-offline` to the offline VM, then run:
+
+```bash
+cd deploy-manager-ui-offline
+sudo SAFECITY_VM_USER="$USER" ./install-offline.sh
+```
+
+The offline installer:
+
+- installs Docker from bundled `.deb` packages when Docker is missing
+- loads the prebuilt website Docker image from `images/deploy-manager-ui.tar`
+- starts the app without pulling from the internet
+- runs the app in host-control mode so `local` scans/deployments operate on the Ubuntu VM host
+
+Optional values:
+
+```bash
+sudo APP_PORT=3001 \
+  SAFECITY_VM_USER="$USER" \
+  SAFECITY_RELEASE_DIR="/home/$USER/SAFECITY_RELEASE" \
+  ./install-offline.sh
 ```
 
 ## Operator Flow
