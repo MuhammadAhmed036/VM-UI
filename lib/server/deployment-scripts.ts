@@ -415,13 +415,170 @@ case "$COMPONENT" in
   *) DIR="" ;;
 esac
 
+have_docker() {
+  command -v docker >/dev/null 2>&1
+}
+
+container_exists() {
+  docker inspect "$1" >/dev/null 2>&1
+}
+
+print_no_container() {
+  echo "No deployed container found for this module."
+  echo "Run Save & deploy first, then use Status or View logs."
+}
+
+show_containers() {
+  local out
+  out="$(docker ps -a ${filters} --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}')"
+  if [ "$(printf '%s\\n' "$out" | wc -l)" -le 1 ]; then
+    print_no_container
+  else
+    printf '%s\\n' "$out"
+  fi
+}
+
+show_status() {
+  if ! have_docker; then
+    echo "Docker is not installed on this VM yet."
+    echo "Streaming Server deployment installs the bundled offline Docker packages."
+    return 0
+  fi
+
+  case "$COMPONENT" in
+    streaming-server)
+      if ! container_exists safecity-mediamtx; then print_no_container; return 0; fi
+      echo "===== STREAMING CONTAINER ====="
+      docker ps -a --filter name=safecity-mediamtx --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
+      echo
+      echo "===== STREAM LIST ====="
+      docker exec safecity-mediamtx python3 /usr/local/bin/mtxctl.py list || true
+      echo
+      echo "===== STREAMING VERIFY ====="
+      docker exec safecity-mediamtx bash /opt/mtxctl-tools/verify_deployment.sh || true
+      ;;
+    nats)
+      if ! container_exists natjet-nats && ! container_exists natjet-sandbox; then print_no_container; return 0; fi
+      echo "===== NATS CONTAINERS ====="
+      docker ps -a --filter name=natjet --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
+      echo
+      echo "===== NATS SERVICE ====="
+      systemctl status natjet.service --no-pager -l || true
+      if [ -d /opt/natjet-offline-1.0.1 ]; then
+        echo
+        echo "===== NATS VERIFY ====="
+        cd /opt/natjet-offline-1.0.1
+        ./scripts/verify.sh --base || true
+      fi
+      ;;
+    rtsp-engine)
+      if ! container_exists rtsp-engine; then print_no_container; return 0; fi
+      echo "===== RTSP CONTAINER ====="
+      docker ps -a --filter name=rtsp-engine --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
+      docker inspect rtsp-engine --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} network={{.HostConfig.NetworkMode}} restart={{.HostConfig.RestartPolicy.Name}}' || true
+      echo
+      echo "===== RTSP IMAGE ====="
+      docker image inspect safecity-rtsp-engine:golden-20260808 --format '{{.Id}}' || true
+      echo
+      echo "===== RTSP HEALTH API ====="
+      python3 - <<'PY' || true
+from urllib.request import urlopen
+print(urlopen("http://127.0.0.1:8080/api/health", timeout=10).read().decode())
+PY
+      ;;
+    consumer-yolo)
+      if ! docker ps -a --filter name=yolo_ --format '{{.Names}}' | grep -q .; then print_no_container; return 0; fi
+      echo "===== YOLO CONTAINERS ====="
+      docker ps -a --filter name=yolo_ --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}'
+      echo
+      echo "===== YOLO HEALTH ====="
+      for c in yolo_postgres_stage2 yolo_event_viewer_stage2 yolo_helper_per_camera_retention_stage2 yolo_ov_nats_worker_stage2; do
+        docker inspect "$c" --format '{{.Name}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} restart={{.HostConfig.RestartPolicy.Name}}' 2>/dev/null || true
+      done
+      echo
+      echo "===== YOLO API ====="
+      python3 - <<'PY' || true
+from urllib.request import urlopen
+print(urlopen("http://127.0.0.1:18088/api/health", timeout=10).read().decode())
+PY
+      ;;
+    ui-dashboard)
+      show_containers
+      [ -n "$DIR" ] && [ -d "$DIR" ] && (cd "$DIR" && docker compose ps || true)
+      ;;
+    *)
+      show_containers
+      ;;
+  esac
+}
+
+show_logs() {
+  if ! have_docker; then
+    echo "Docker is not installed on this VM yet."
+    return 0
+  fi
+
+  case "$COMPONENT" in
+    streaming-server)
+      if ! container_exists safecity-mediamtx; then print_no_container; return 0; fi
+      docker logs --tail 240 safecity-mediamtx 2>&1
+      ;;
+    nats)
+      if ! container_exists natjet-nats && ! container_exists natjet-sandbox; then print_no_container; return 0; fi
+      echo "===== NATJET SERVICE LOGS ====="
+      journalctl -u natjet.service --no-pager -n 120 -l || true
+      echo
+      for c in natjet-nats natjet-sandbox; do
+        if container_exists "$c"; then
+          echo "===== $c LOGS ====="
+          docker logs --tail 160 "$c" 2>&1 || true
+        fi
+      done
+      ;;
+    rtsp-engine)
+      if ! container_exists rtsp-engine; then print_no_container; return 0; fi
+      docker logs --tail 240 rtsp-engine 2>&1 \
+        | sed -E 's#(nats://)[^@ ]+@#\\1***@#g; s#(rtsp://)[^@ ]+@#\\1***:***@#g' \
+        | grep -Ei 'RTSP Snapshot Engine|worker|ffmpeg|snapshot|nats|publish|frames|error|fail|timeout|health' \
+        || true
+      ;;
+    consumer-yolo)
+      if ! docker ps -a --filter name=yolo_ --format '{{.Names}}' | grep -q .; then print_no_container; return 0; fi
+      for c in yolo_ov_nats_worker_stage2 yolo_event_viewer_stage2 yolo_helper_per_camera_retention_stage2 yolo_postgres_stage2; do
+        if container_exists "$c"; then
+          echo "===== $c LOGS ====="
+          docker logs --tail 180 "$c" 2>&1 \
+            | sed -E 's#(nats://)[^@ ]+@#\\1***@#g' \
+            | tail -180 || true
+          echo
+        fi
+      done
+      ;;
+    ui-dashboard)
+      if ! container_exists safecity-dashboard; then print_no_container; return 0; fi
+      docker logs --tail 240 safecity-dashboard 2>&1
+      ;;
+    *)
+      local found=0
+      for c in ${serviceNames}; do
+        if container_exists "$c"; then
+          found=1
+          echo "===== $c LOGS ====="
+          docker logs --tail 160 "$c" 2>&1 || true
+        fi
+      done
+      [ "$found" = "1" ] || print_no_container
+      ;;
+  esac
+}
+
 if [ "$ACTION" = "status" ]; then
-  docker ps -a ${filters} --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}'
+  show_status
   exit 0
 fi
 
 if [ "$ACTION" = "logs" ]; then
-  docker logs --tail 240 ${serviceNames} 2>&1 || true
+  show_logs
   exit 0
 fi
 
