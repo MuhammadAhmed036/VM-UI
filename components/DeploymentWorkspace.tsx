@@ -5,12 +5,12 @@ import type { DeployComponent, DeploymentStatus, JobSnapshot, PackageFile, VmCon
 import { BoltIcon, CheckIcon, FolderIcon, RefreshIcon, SettingsIcon, StopIcon, TerminalIcon } from "./Icons";
 
 const defaultVm: VmConnectionConfig = {
-  host: "",
-  user: "aitest",
+  host: "local",
+  user: "",
   port: "22",
   sshKeyPath: "",
   releaseDir: "$HOME/SAFECITY_RELEASE",
-  scanDirs: "$HOME/SAFECITY_RELEASE\n$HOME\n/opt",
+  scanDirs: "$HOME/SAFECITY_RELEASE",
   sudo: true,
 };
 
@@ -69,7 +69,8 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
   }
 
   function validate() {
-    if (!vm.host.trim() || !vm.user.trim()) return "VM IP/host and SSH user are required.";
+    const local = ["", "local", "localhost", "127.0.0.1", "::1"].includes(vm.host.trim().toLowerCase());
+    if (!local && (!vm.host.trim() || !vm.user.trim())) return "Remote VM IP/host and SSH user are required.";
     if (!selectedPackagePath) return "Select a package from the VM first.";
     const missing = component.fields.find((field) => field.required && !String(config[field.key] ?? "").trim());
     if (missing) return `${missing.label} is required.`;
@@ -77,14 +78,8 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
   }
 
   async function scanPackages() {
-    if (!vm.host.trim() || !vm.user.trim()) {
-      setLogs(["VM IP/host and SSH user are required before scanning."]);
-      setStatus("failed");
-      return;
-    }
-
     setStatus("scanning");
-    setLogs(["Scanning configured directories on the Ubuntu VM..."]);
+    setLogs(["Scanning configured directories on this Ubuntu VM..."]);
     setSelectedPackagePath("");
 
     const res = await fetch("/api/packages", {
@@ -205,7 +200,7 @@ export function DeploymentWorkspace({ component }: { component: DeployComponent 
           <div className="scan-box">
             <div>
               <strong>Packages already on the VM</strong>
-              <span>The server scans these remote directories over SSH.</span>
+              <span>Use local for this VM, or enter SSH details for another VM.</span>
             </div>
             <button className="secondary-button" onClick={scanPackages} disabled={status === "scanning" || status === "running"}>
               <RefreshIcon className={status === "scanning" ? "button-icon spinning" : "button-icon"} />

@@ -27,10 +27,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown component" }, { status: 400 });
   }
 
-  if (!body.vm.host || !body.vm.user) {
-    return NextResponse.json({ error: "VM host and SSH user are required" }, { status: 400 });
-  }
-
   const dirs = parseDirs(body.vm, component.defaultScanDirs);
   const patterns = component.packagePatterns.length ? component.packagePatterns : ["*.tar", "*.tar.gz", "*.tgz"];
   const findNames = patterns.map((pattern) => `-name ${sh(pattern)}`).join(" -o ");

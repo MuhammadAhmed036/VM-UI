@@ -61,13 +61,16 @@ http://localhost:3000
 1. Open the web UI.
 2. Select Main, Consumer, or UI.
 3. Select the deployment module.
-4. Enter VM SSH details and scan directories.
-5. Scan packages already present on the Ubuntu VM.
-6. Select the required package.
-7. Fill the configuration form.
-8. Click Save & deploy.
-9. Watch live deployment logs and final status.
-10. Use Start, Stop, Restart, Apply config, Status, or View logs after deployment.
+4. Keep VM IP / host as `local` when the UI is running on the same Ubuntu VM.
+5. Keep the scan directory as `$HOME/SAFECITY_RELEASE` when packages are already there.
+6. Scan packages already present on the Ubuntu VM.
+7. Select the required package.
+8. Fill the configuration form.
+9. Click Save & deploy.
+10. Watch live deployment logs and final status.
+11. Use Start, Stop, Restart, Apply config, Status, or View logs after deployment.
+
+Main contains only the three core modules: Streaming Server, Golden RTSP Engine, and NATS / JetStream. YOLO stays under Consumer, including its PostgreSQL dependency.
 
 ## Validation
 
