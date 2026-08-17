@@ -25,6 +25,7 @@ log "Copying offline runtime files"
 cp "$ROOT/docker-compose.yml" "$OUT/docker-compose.yml"
 cp "$ROOT/scripts/offline/install-offline.sh" "$OUT/install-offline.sh"
 cp "$ROOT/scripts/offline/README-OFFLINE.md" "$OUT/README-OFFLINE.md"
+cp "$ROOT/scripts/offline/DEPLOY-WEBSITE-OFFLINE.md" "$OUT/DEPLOY-WEBSITE-OFFLINE.md"
 chmod 750 "$OUT/install-offline.sh"
 
 if command -v apt-get >/dev/null 2>&1; then
