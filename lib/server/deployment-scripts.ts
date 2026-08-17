@@ -257,6 +257,15 @@ function yoloScript(request: DeploymentRequest) {
 log "Installing YOLO Stage2 Consumer"
 cd "$(dirname "$PACKAGE_PATH")"
 [ ! -f "$PACKAGE_PATH.sha256" ] || sha256sum -c "$PACKAGE_PATH.sha256"
+
+PREVIOUS_YOLO_ENV=""
+if [ -f /opt/yolo-stage2/bundle/deploy/stage2_docker/.env ]; then
+  PREVIOUS_YOLO_ENV="/tmp/yolo-stage2-existing-env.$$"
+  cp -a /opt/yolo-stage2/bundle/deploy/stage2_docker/.env "$PREVIOUS_YOLO_ENV"
+  chmod 600 "$PREVIOUS_YOLO_ENV"
+  log "Preserved existing YOLO .env before refreshing package"
+fi
+
 rm -rf /opt/yolo-stage2
 tar -xzf "$PACKAGE_PATH" -C /opt
 YOLO_DIR="/opt/yolo-stage2/bundle/deploy/stage2_docker"
@@ -265,10 +274,50 @@ require_file "$YOLO_DIR/install.sh"
 require_file "$YOLO_DIR/docker-compose.yml"
 require_file "$YOLO_DIR/postgres/migrations/011_drop_legacy_raw_status_index.sql"
 cd "$YOLO_DIR"
+[ -z "$PREVIOUS_YOLO_ENV" ] || cp -a "$PREVIOUS_YOLO_ENV" "$YOLO_DIR/.env"
+[ -z "$PREVIOUS_YOLO_ENV" ] || log "Restored existing YOLO .env so PostgreSQL credentials stay consistent"
 rm -f ./yolo-stage2-offline-images.tar
 ln -s ../../images.tar ./yolo-stage2-offline-images.tar
+[ -x ./install.sh ] || chmod 750 ./install.sh
+
+if command -v docker >/dev/null 2>&1 && docker inspect yolo_postgres_stage2 >/dev/null 2>&1 && [ -f "$YOLO_DIR/.env" ]; then
+  PG_USER="$(awk -F= '$1=="POSTGRES_USER"{print substr($0,index($0,"=")+1)}' "$YOLO_DIR/.env")"
+  PG_DB="$(awk -F= '$1=="POSTGRES_DB"{print substr($0,index($0,"=")+1)}' "$YOLO_DIR/.env")"
+  PG_PASS="$(awk -F= '$1=="POSTGRES_PASSWORD"{print substr($0,index($0,"=")+1)}' "$YOLO_DIR/.env")"
+  [ -n "$PG_USER" ] || PG_USER="yolo"
+  [ -n "$PG_DB" ] || PG_DB="yolo_events"
+  if [ -n "$PG_PASS" ]; then
+    log "Synchronizing existing YOLO PostgreSQL password with .env"
+    docker start yolo_postgres_stage2 >/dev/null 2>&1 || true
+    for i in $(seq 1 60); do
+      STATE="$(docker inspect yolo_postgres_stage2 --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+      [ "$STATE" = "healthy" ] || [ "$STATE" = "running" ] && break
+      sleep 2
+    done
+    if ! docker exec -e PGPASSWORD="$PG_PASS" yolo_postgres_stage2 psql -U "$PG_USER" -d "$PG_DB" -c 'SELECT 1' >/dev/null 2>&1; then
+      docker exec yolo_postgres_stage2 psql -U "$PG_USER" -d "$PG_DB" -v "newpass=$PG_PASS" -v ON_ERROR_STOP=1 -c "ALTER USER yolo WITH PASSWORD :'newpass';" >/dev/null \
+        || log "Existing YOLO PostgreSQL password could not be reset before install; installer will report the detailed DB error"
+    fi
+  fi
+fi
+
 ./install.sh --role full --ip "$VM_IP" --worker-id "$(cfg workerId)" --nats-url "$(cfg natsUrl)" --dashboard-port "$(cfg dashboardPort)" --postgres-port "$(cfg postgresPort)"
 env_set "$YOLO_DIR/.env" NATS_SUBJECT "$(cfg natsSubject)"
+env_set "$YOLO_DIR/.env" NATS_URL "$(cfg natsUrl)"
+env_set "$YOLO_DIR/.env" WORKER_ID "$(cfg workerId)"
+env_set "$YOLO_DIR/.env" WORKER_IP "$VM_IP"
+cat > "$YOLO_DIR/docker-compose.override.yml" <<'EOF'
+services:
+  postgres:
+    restart: unless-stopped
+  dashboard:
+    restart: unless-stopped
+  helper-per-camera-retention:
+    restart: unless-stopped
+  worker:
+    restart: unless-stopped
+EOF
+chmod 644 "$YOLO_DIR/docker-compose.override.yml"
 docker compose up -d --pull never postgres
 docker compose up -d --pull never dashboard helper-per-camera-retention
 docker compose up -d --pull never --no-deps --force-recreate worker
