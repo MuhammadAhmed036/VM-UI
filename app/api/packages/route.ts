@@ -12,11 +12,19 @@ interface PackageScanBody {
 }
 
 function parseDirs(vm: VmConnectionConfig, fallback: string[]) {
-  const raw = vm.scanDirs.trim() || fallback.join("\n");
+  const raw = [vm.scanDirs.trim(), vm.releaseDir.trim(), fallback.join("\n")]
+    .filter(Boolean)
+    .join("\n");
+  const seen = new Set<string>();
   return raw
     .split(/\r?\n|,/)
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,11 +41,29 @@ export async function POST(request: NextRequest) {
   const safeDirs = dirs.map((dir) => sh(dir)).join(" ");
   const command = `bash -lc ${sh(`
 set -e
-for d in ${safeDirs}; do
-  eval "expanded=\\"$d\\""
-  [ -d "$expanded" ] || continue
+scan_dir() {
+  local expanded="$1"
+  [ -d "$expanded" ] || return 0
   find "$expanded" -maxdepth 1 -type f \\( ${findNames} \\) -printf '%p\\t%s\\t%TY-%Tm-%Td %TH:%TM\\n'
-done | head -100
+}
+
+{
+  for d in ${safeDirs}; do
+    eval "expanded=\\"$d\\""
+    scan_dir "$expanded"
+
+    if [[ "$d" == "\\$HOME/"* ]]; then
+      suffix="\${d#\\$HOME/}"
+      [ -n "\${SUDO_USER:-}" ] && scan_dir "/home/$SUDO_USER/$suffix"
+      [ -n "\${USER:-}" ] && scan_dir "/home/$USER/$suffix"
+    fi
+  done
+
+  for fallback_dir in /home/*/SAFECITY_RELEASE; do
+    [ -d "$fallback_dir" ] || continue
+    scan_dir "$fallback_dir"
+  done
+} | head -100
 `)}`;
 
   const result = await runSshCommand(body.vm, command);
